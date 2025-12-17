@@ -1,0 +1,143 @@
+// jenkins/Jenkinsfile
+pipeline {
+    agent {
+        label 'agent-ssh'
+    }
+    
+    environment {
+        DOCKER_REGISTRY = 'docker.io'
+        PROJECT_NAME = 'movierec'
+        BUILD_NUMBER = "${env.BUILD_NUMBER}"
+    }
+    
+    stages {
+        stage('Préparation') {
+            steps {
+                echo '========== Début du Pipeline =========='
+                echo "Build Number: ${BUILD_NUMBER}"
+                sh 'docker --version'
+                sh 'docker-compose --version'
+                sh 'git --version'
+            }
+        }
+        
+        stage('Checkout') {
+            steps {
+                echo '========== Récupération du code =========='
+                checkout scm
+            }
+        }
+        
+        stage('Build Frontend') {
+            steps {
+                echo '========== Build du Frontend =========='
+                dir('frontend') {
+                    sh '''
+                        docker build -t ${PROJECT_NAME}-frontend:${BUILD_NUMBER} .
+                        docker tag ${PROJECT_NAME}-frontend:${BUILD_NUMBER} ${PROJECT_NAME}-frontend:latest
+                    '''
+                }
+            }
+        }
+        
+        stage('Build Backend') {
+            steps {
+                echo '========== Build du Backend =========='
+                dir('backend') {
+                    sh '''
+                        docker build -t ${PROJECT_NAME}-backend:${BUILD_NUMBER} .
+                        docker tag ${PROJECT_NAME}-backend:${BUILD_NUMBER} ${PROJECT_NAME}-backend:latest
+                    '''
+                }
+            }
+        }
+        
+        stage('Build IA Service') {
+            steps {
+                echo '========== Build du Service IA =========='
+                dir('ia-service') {
+                    sh '''
+                        docker build -t ${PROJECT_NAME}-ia:${BUILD_NUMBER} .
+                        docker tag ${PROJECT_NAME}-ia:${BUILD_NUMBER} ${PROJECT_NAME}-ia:latest
+                    '''
+                }
+            }
+        }
+        
+        stage('Tests') {
+            parallel {
+                stage('Test Backend') {
+                    steps {
+                        echo '========== Test du Backend =========='
+                        sh '''
+                            docker run --rm ${PROJECT_NAME}-backend:latest node --version
+                        '''
+                    }
+                }
+                
+                stage('Test IA Service') {
+                    steps {
+                        echo '========== Test du Service IA =========='
+                        sh '''
+                            docker run --rm ${PROJECT_NAME}-ia:latest python --version
+                        '''
+                    }
+                }
+            }
+        }
+        
+        stage('Déploiement') {
+            steps {
+                echo '========== Déploiement des services =========='
+                sh '''
+                    # Arrêter les containers existants
+                    docker-compose down || true
+                    
+                    # Démarrer les nouveaux containers
+                    docker-compose up -d
+                    
+                    # Attendre que les services démarrent
+                    sleep 10
+                    
+                    # Vérifier l'état des containers
+                    docker-compose ps
+                '''
+            }
+        }
+        
+        stage('Vérification Santé') {
+            steps {
+                echo '========== Vérification de la santé des services =========='
+                sh '''
+                    # Vérifier le backend
+                    curl -f http://localhost:5000/health || exit 1
+                    
+                    # Vérifier le service IA
+                    curl -f http://localhost:8000/health || exit 1
+                    
+                    echo "Tous les services sont opérationnels!"
+                '''
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo '========== Pipeline terminé avec succès! =========='
+            sh 'docker images | grep ${PROJECT_NAME}'
+        }
+        
+        failure {
+            echo '========== Échec du Pipeline =========='
+            sh 'docker-compose logs'
+        }
+        
+        always {
+            echo '========== Nettoyage =========='
+            sh '''
+                # Supprimer les images non utilisées
+                docker image prune -f
+            '''
+        }
+    }
+}

@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - movierec-network
+
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - ia-service
+    networks:
+      - movierec-network
+    restart: unless-stopped
+
+  ia-service:
+    build: ./ia-service
+    ports:
+      - "8000:8000"
+    environment:
+      - FLASK_ENV=production
+    networks:
+      - movierec-network
+    restart: unless-stopped
+
+networks:
+  movierec-network:
+    driver: bridge
