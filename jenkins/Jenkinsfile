@@ -5,9 +5,9 @@ pipeline {
     }
     
     environment {
-        DOCKER_REGISTRY = 'docker.io'
         PROJECT_NAME = 'movierec'
         BUILD_NUMBER = "${env.BUILD_NUMBER}"
+        WORKSPACE_PATH = '/vagrant'
     }
     
     stages {
@@ -15,16 +15,31 @@ pipeline {
             steps {
                 echo '========== Début du Pipeline =========='
                 echo "Build Number: ${BUILD_NUMBER}"
+                echo "Workspace: ${WORKSPACE_PATH}"
                 sh 'docker --version'
                 sh 'docker-compose --version'
-                sh 'git --version'
+                sh 'pwd'
+                sh 'ls -la'
             }
         }
         
-        stage('Checkout') {
+        stage('Vérification Code') {
             steps {
-                echo '========== Récupération du code =========='
-                checkout scm
+                echo '========== Vérification de la structure du projet =========='
+                sh '''
+                    cd ${WORKSPACE_PATH}
+                    echo "Contenu du répertoire:"
+                    ls -la
+                    
+                    echo "\n=== Structure Frontend ==="
+                    ls -la frontend/ || echo "Frontend non trouvé"
+                    
+                    echo "\n=== Structure Backend ==="
+                    ls -la backend/ || echo "Backend non trouvé"
+                    
+                    echo "\n=== Structure IA Service ==="
+                    ls -la ia-service/ || echo "IA Service non trouvé"
+                '''
             }
         }
         
