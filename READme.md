@@ -138,132 +138,106 @@ sudo cat /home/jenkins/.ssh/id_rsa
 5. **Jenkinsfile à copier:**
 
 ```groovy
-pipeline {
-    agent {
-        label 'agent-ssh'
-    }
-    
-    environment {
-        PROJECT_NAME = 'movierec'
-        BUILD_NUMBER = "${env.BUILD_NUMBER}"
-        WORKSPACE_PATH = '/vagrant'
-    }
-    
-    stages {
-        stage('Préparation') {
-            steps {
-                echo '========== Début du Pipeline =========='
-                echo "Build Number: ${BUILD_NUMBER}"
-                sh 'docker --version'
-                sh 'docker-compose --version'
-            }
-        }
-        
-        stage('Vérification Code') {
-            steps {
-                echo '========== Vérification de la structure du projet =========='
-                sh '''
-                    cd ${WORKSPACE_PATH}
-                    ls -la frontend/ backend/ ia-service/
-                '''
-            }
-        }
-        
-        stage('Build Frontend') {
-            steps {
-                echo '========== Build du Frontend =========='
-                sh '''
-                    cd ${WORKSPACE_PATH}/frontend
-                    docker build -t ${PROJECT_NAME}-frontend:${BUILD_NUMBER} .
-                    docker tag ${PROJECT_NAME}-frontend:${BUILD_NUMBER} ${PROJECT_NAME}-frontend:latest
-                '''
-            }
-        }
-        
-        stage('Build Backend') {
-            steps {
-                echo '========== Build du Backend =========='
-                sh '''
-                    cd ${WORKSPACE_PATH}/backend
-                    docker build -t ${PROJECT_NAME}-backend:${BUILD_NUMBER} .
-                    docker tag ${PROJECT_NAME}-backend:${BUILD_NUMBER} ${PROJECT_NAME}-backend:latest
-                '''
-            }
-        }
-        
-        stage('Build IA Service') {
-            steps {
-                echo '========== Build du Service IA =========='
-                sh '''
-                    cd ${WORKSPACE_PATH}/ia-service
-                    docker build -t ${PROJECT_NAME}-ia:${BUILD_NUMBER} .
-                    docker tag ${PROJECT_NAME}-ia:${BUILD_NUMBER} ${PROJECT_NAME}-ia:latest
-                '''
-            }
-        }
-        
-        stage('Tests') {
-            parallel {
-                stage('Test Backend') {
-                    steps {
-                        echo '========== Test du Backend =========='
-                        sh 'docker run --rm ${PROJECT_NAME}-backend:latest node --version'
-                    }
-                }
-                
-                stage('Test IA Service') {
-                    steps {
-                        echo '========== Test du Service IA =========='
-                        sh 'docker run --rm ${PROJECT_NAME}-ia:latest python --version'
-                    }
-                }
-            }
-        }
-        
-        stage('Déploiement') {
-            steps {
-                echo '========== Déploiement des services =========='
-                sh '''
-                    cd ${WORKSPACE_PATH}
-                    docker-compose down || true
-                    docker-compose up -d
-                    sleep 15
-                    docker-compose ps
-                '''
-            }
-        }
-        
-        stage('Vérification Santé') {
-            steps {
-                echo '========== Vérification de la santé des services =========='
-                sh '''
-                    for i in 1 2 3 4 5; do
-                        curl -f http://localhost:5000/health && break || sleep 3
-                    done
-                    for i in 1 2 3 4 5; do
-                        curl -f http://localhost:8000/health && break || sleep 3
-                    done
-                '''
-            }
-        }
-    }
-    
-    post {
-        success {
-            echo '========== Pipeline terminé avec succès! =========='
-            sh 'docker images | grep ${PROJECT_NAME}'
-        }
-        
-        failure {
-            echo '========== Échec du Pipeline =========='
-            sh 'cd ${WORKSPACE_PATH} && docker-compose logs --tail=50'
-        }
-        
-        always {
-            echo '========== Nettoyage =========='
-            sh 'docker image prune -f || true'
-        }
-    }
+pipeline { 
+    agent any 
+
+    environment { 
+        PROJECT_DIR = "/var/jenkins_home/workspace/movierec-cicd" 
+        FRONTEND_IMAGE = "movierec-frontend:${BUILD_NUMBER}" 
+        BACKEND_IMAGE = "movierec-backend:${BUILD_NUMBER}" 
+        AI_IMAGE = "movierec-ai:${BUILD_NUMBER}" 
+    } 
+
+    stages { 
+        stage('Préparation') { 
+            steps { 
+                ws("${PROJECT_DIR}") { 
+                    echo "========== Début du Pipeline ==========" // Copier les fichiers depuis /vagrant vers le workspace Jenkins 
+                    sh 'cp -r /vagrant/* .' 
+                    sh ''' 
+                        docker --version 
+                        docker compose version 
+                        ls -la $PROJECT_DIR 
+                    ''' 
+                } 
+            } 
+        } 
+
+        stage('Vérification structure') { 
+            steps { 
+                ws("${PROJECT_DIR}") { 
+                    sh ''' 
+                        echo "=== Frontend ===" 
+                        ls -la frontend 
+                        echo "=== Backend ===" 
+                        ls -la backend 
+                        echo "=== AI Service ===" 
+                        ls -la ai-service 
+                    ''' 
+                } 
+            } 
+        } 
+
+        stage('Build Frontend') { 
+            steps { 
+                ws("${PROJECT_DIR}") { 
+                    dir('frontend') { 
+                        sh 'docker build -t $FRONTEND_IMAGE .' 
+                    } 
+                } 
+            } 
+        } 
+
+        stage('Build Backend') { 
+            steps { 
+                ws("${PROJECT_DIR}") { 
+                    dir('backend') { 
+                        sh 'docker build -t $BACKEND_IMAGE .' 
+                    } 
+                } 
+            } 
+        } 
+
+        stage('Build AI Service') { 
+            steps { 
+                ws("${PROJECT_DIR}") { 
+                    dir('ai-service') { 
+                        sh 'docker build -t $AI_IMAGE .' 
+                    } 
+                } 
+            } 
+        } 
+
+        stage('Déploiement') { 
+            steps { 
+                ws("${PROJECT_DIR}") { 
+                    sh 'docker compose down || true; docker compose up -d' 
+                } 
+            } 
+        } 
+
+        stage('Vérification Santé') { 
+            steps { 
+                ws("${PROJECT_DIR}") { 
+                    sh ''' 
+                        sleep 10 
+                        curl -f http://localhost:3000 || exit 1 
+                        curl -f http://localhost:5000/health || exit 1 
+                        curl -f http://localhost:8000/health || exit 1 
+                    ''' 
+                } 
+            } 
+        } 
+    } 
+
+    post { 
+        success { 
+            echo "✅ Pipeline réussi" 
+        } 
+        failure { 
+            echo "❌ Pipeline échoué" 
+        } 
+    } 
 }
 ```
 
