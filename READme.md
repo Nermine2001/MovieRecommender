@@ -2,6 +2,8 @@
 
 Projet microservices avec Frontend React, Backend Node.js, Service IA Python, Docker et CI/CD Jenkins.
 
+> **Note**: Ce projet utilise Jenkins avec `agent any` et Git pour le versioning. Simple à déployer !
+
 ## 📋 Architecture
 
 ```
@@ -20,231 +22,123 @@ Projet microservices avec Frontend React, Backend Node.js, Service IA Python, Do
 ## 🚀 Installation Rapide
 
 ### Prérequis
-- VirtualBox
-- Vagrant
-- Git
+- Docker et Docker Compose
+- Git (pour méthode Jenkins)
+- Jenkins (pour CI/CD automatique)
 
-### Étape 1: Créer la structure
+### 🎯 Choisissez votre méthode
 
-```bash
-mkdir movierec && cd movierec
-mkdir -p frontend/src backend ia-service jenkins
-
-# Créer tous les fichiers selon l'arborescence fournie
-```
-
-### Étape 2: Lancer Vagrant
+#### **Méthode 1: Jenkins + Git (RECOMMANDÉ pour production)**
 
 ```bash
-vagrant up
+# 1. Cloner le projet
+git clone https://github.com/<votre-user>/movierec.git
+cd movierec
+
+# 2. Configurer Jenkins
+# - New Item → Pipeline
+# - SCM: Git → Repository: votre repo
+# - Script Path: Jenkinsfile
+
+# 3. Build Now!
 ```
 
-Cela va créer deux VMs:
-- **jenkins-master** (192.168.56.10): Jenkins + Docker
-- **jenkins-agent** (192.168.56.11): Agent distant + Docker
+**Documentation complète**: [Guide Git + Jenkins](GIT_JENKINS_GUIDE.md)
 
-### Étape 3: Se connecter au Master
+#### **Méthode 2: Script de Déploiement Rapide**
 
 ```bash
-vagrant ssh jenkins-master
-cd /vagrant
+# 1. Cloner ou créer le projet
+cd movierec
+
+# 2. Rendre le script exécutable
+chmod +x quick-deploy.sh
+
+# 3. Déployer automatiquement
+./quick-deploy.sh --auto
+
+# Ou en mode interactif
+./quick-deploy.sh
 ```
 
-### Étape 4: Lancer les services
+#### **Méthode 3: Manuel avec Docker Compose**
 
 ```bash
-sudo docker-compose up --build -d
+# 1. Cloner le projet
+git clone https://github.com/<votre-user>/movierec.git
+cd movierec
+
+# 2. Build et lancer
+docker compose up --build -d
+
+# 3. Vérifier
+docker compose ps
 ```
 
-### Étape 5: Vérifier les services
+### 🌐 Accès aux Services
 
+Une fois déployé:
+- **Frontend**: http://localhost:3000
+- **Backend**: http://localhost:5000
+- **IA Service**: http://localhost:8000
+
+---
+
+## 🔧 Configuration Jenkins (Pipeline depuis Git)
+
+### 1. Installer Jenkins
+
+**Sur Ubuntu/Debian:**
 ```bash
-sudo docker-compose ps
+# Installer Java
+sudo apt update
+sudo apt install openjdk-11-jdk -y
 
-# Tester le backend
-curl http://localhost:5000/health
+# Ajouter le repo Jenkins
+wget -q -O - https://pkg.jenkins.io/debian-stable/jenkins.io.key | sudo apt-key add -
+sudo sh -c 'echo deb https://pkg.jenkins.io/debian-stable binary/ > /etc/apt/sources.list.d/jenkins.list'
 
-# Tester l'IA
-curl http://localhost:8000/health
-```
+# Installer Jenkins
+sudo apt update
+sudo apt install jenkins -y
 
-## 🔧 Configuration Jenkins
+# Démarrer Jenkins
+sudo systemctl start jenkins
+sudo systemctl enable jenkins
 
-### 1. Accéder à Jenkins
-```
-http://localhost:8080
-```
-
-Récupérer le mot de passe initial:
-```bash
-vagrant ssh jenkins-master
+# Récupérer le mot de passe initial
 sudo cat /var/lib/jenkins/secrets/initialAdminPassword
 ```
 
+**Accéder à Jenkins**: http://localhost:8080
+
 ### 2. Installer les plugins requis
-- SSH Agent Plugin
+
 - Docker Pipeline
-- Pipeline (installé par défaut)
-- Credentials Plugin (installé par défaut)
+- Git Plugin
+- Pipeline Plugin
 
-### 3. Configurer l'agent SSH
-
-**Dans Jenkins Master:**
-
-1. **Manage Jenkins** → **Manage Nodes and Clouds** → **New Node**
-   - Name: `agent-ssh`
-   - Type: Permanent Agent
-   - Click OK
-
-2. **Configuration de l'agent:**
-   - Remote root directory: `/home/jenkins`
-   - Labels: `agent-ssh`
-   - Usage: Use this node as much as possible
-   - Launch method: **Launch agents via SSH**
-   - Host: `192.168.56.11`
-   - Credentials: Ajouter les credentials SSH (voir ci-dessous)
-   - Host Key Verification Strategy: Non verifying Verification Strategy
-
-**Pour obtenir la clé SSH:**
-```bash
-vagrant ssh jenkins-agent
-sudo cat /home/jenkins/.ssh/id_rsa
-```
-
-3. **Ajouter les credentials:**
-   - Manage Jenkins → Manage Credentials → Global → Add Credentials
-   - Kind: **SSH Username with private key**
-   - ID: `jenkins-ssh-key`
-   - Username: `jenkins`
-   - Private Key: **Enter directly**
-   - Coller la clé privée obtenue ci-dessus
-   - Click OK
-
-### 4. Créer le Pipeline (SANS SCM)
+### 3. Créer le Pipeline depuis Git
 
 1. **New Item** → **Pipeline** → Nom: `MovieRec-Pipeline`
 
 2. **General Configuration:**
    - Description: Pipeline de build et déploiement MovieRec
-   - ✅ Do not allow concurrent builds (optionnel)
+   - ✅ GitHub project (optionnel): URL de votre repo
 
-3. **Build Triggers:** (optionnel)
-   - Poll SCM ou Build periodically selon vos besoins
+3. **Build Triggers:**
+   - ✅ Poll SCM: `H/5 * * * *` (vérifie Git toutes les 5 minutes)
+   - Ou GitHub hook trigger (si webhook configuré)
 
 4. **Pipeline Configuration:**
-   - Definition: **Pipeline script** (PAS "from SCM")
-   - Script: Copier-coller le contenu complet du Jenkinsfile ci-dessous
+   - Definition: **Pipeline script from SCM**
+   - SCM: **Git**
+   - Repository URL: `https://github.com/<votre-user>/movierec.git`
+   - Credentials: Ajouter si repo privé
+   - Branch Specifier: `*/main` (ou `*/master`)
+   - Script Path: `Jenkinsfile`
 
-5. **Jenkinsfile à copier:**
-
-```groovy
-pipeline { 
-    agent any 
-
-    environment { 
-        PROJECT_DIR = "/var/jenkins_home/workspace/movierec-cicd" 
-        FRONTEND_IMAGE = "movierec-frontend:${BUILD_NUMBER}" 
-        BACKEND_IMAGE = "movierec-backend:${BUILD_NUMBER}" 
-        AI_IMAGE = "movierec-ai:${BUILD_NUMBER}" 
-    } 
-
-    stages { 
-        stage('Préparation') { 
-            steps { 
-                ws("${PROJECT_DIR}") { 
-                    echo "========== Début du Pipeline ==========" // Copier les fichiers depuis /vagrant vers le workspace Jenkins 
-                    sh 'cp -r /vagrant/* .' 
-                    sh ''' 
-                        docker --version 
-                        docker compose version 
-                        ls -la $PROJECT_DIR 
-                    ''' 
-                } 
-            } 
-        } 
-
-        stage('Vérification structure') { 
-            steps { 
-                ws("${PROJECT_DIR}") { 
-                    sh ''' 
-                        echo "=== Frontend ===" 
-                        ls -la frontend 
-                        echo "=== Backend ===" 
-                        ls -la backend 
-                        echo "=== AI Service ===" 
-                        ls -la ai-service 
-                    ''' 
-                } 
-            } 
-        } 
-
-        stage('Build Frontend') { 
-            steps { 
-                ws("${PROJECT_DIR}") { 
-                    dir('frontend') { 
-                        sh 'docker build -t $FRONTEND_IMAGE .' 
-                    } 
-                } 
-            } 
-        } 
-
-        stage('Build Backend') { 
-            steps { 
-                ws("${PROJECT_DIR}") { 
-                    dir('backend') { 
-                        sh 'docker build -t $BACKEND_IMAGE .' 
-                    } 
-                } 
-            } 
-        } 
-
-        stage('Build AI Service') { 
-            steps { 
-                ws("${PROJECT_DIR}") { 
-                    dir('ai-service') { 
-                        sh 'docker build -t $AI_IMAGE .' 
-                    } 
-                } 
-            } 
-        } 
-
-        stage('Déploiement') { 
-            steps { 
-                ws("${PROJECT_DIR}") { 
-                    sh 'docker compose down || true; docker compose up -d' 
-                } 
-            } 
-        } 
-
-        stage('Vérification Santé') { 
-            steps { 
-                ws("${PROJECT_DIR}") { 
-                    sh ''' 
-                        sleep 10 
-                        curl -f http://localhost:3000 || exit 1 
-                        curl -f http://localhost:5000/health || exit 1 
-                        curl -f http://localhost:8000/health || exit 1 
-                    ''' 
-                } 
-            } 
-        } 
-    } 
-
-    post { 
-        success { 
-            echo "✅ Pipeline réussi" 
-        } 
-        failure { 
-            echo "❌ Pipeline échoué" 
-        } 
-    } 
-}
-```
-
-6. **Sauvegarder et Lancer:**
-   - Click **Save**
-   - Click **Build Now**
-   - Suivre l'exécution dans **Console Output**
+5. **Save** et **Build Now**
 
 ## 📦 Structure des Fichiers
 
@@ -263,14 +157,13 @@ movierec/
 │   ├── server.js               # Serveur Express
 │   ├── package.json            # Dépendances npm
 │   └── Dockerfile              # Image Docker Backend
-├── ia-service/
+├── ai-service/
 │   ├── app.py                  # Service Flask IA
 │   ├── requirements.txt        # Dépendances Python
 │   └── Dockerfile              # Image Docker IA
-├── jenkins/
-│   └── Jenkinsfile             # Pipeline CI/CD
 ├── docker-compose.yml          # Orchestration Docker
-├── Vagrantfile                 # Configuration Vagrant
+├── Jenkinsfile                 # Pipeline CI/CD (à la racine!)
+├── .gitignore                  # Fichiers à ignorer
 └── README.md                   # Ce fichier
 ```
 
@@ -316,82 +209,65 @@ curl -X POST http://localhost:8000/recommend \
 
 ## 🔄 Pipeline Jenkins
 
-Le pipeline s'exécute sur l'**agent SSH distant** et comprend:
+Le pipeline s'exécute automatiquement et comprend:
 
-1. **Préparation**: Vérification de l'environnement Docker
+1. **Préparation**: Vérification Docker et Docker Compose
 2. **Vérification Code**: Validation de la structure du projet
-3. **Build**: Construction des 3 images Docker en séquence
-4. **Tests**: Tests parallèles des services (Node.js, Python)
-5. **Déploiement**: Lancement avec docker-compose sur l'agent
-6. **Vérification**: Health checks avec retry automatique
+3. **Build**: Construction des 3 images Docker
+4. **Tests**: Tests parallèles (Node.js, Python)
+5. **Déploiement**: Lancement avec docker-compose
+6. **Vérification Santé**: Health checks avec retry automatique
 
-### Configuration importante
+### Déclencher le pipeline
 
-Le pipeline utilise:
-- **Agent**: `agent-ssh` (l'agent distant configuré)
-- **Workspace**: `/vagrant` (dossier partagé Vagrant)
-- **Exécution**: Directement sur l'agent, pas sur master
+**Automatiquement:**
+- À chaque push Git (si webhook configuré)
+- Toutes les 5 minutes (si Poll SCM activé)
 
-### Lancer le pipeline
-
-**Via Interface Jenkins:**
-1. Aller sur http://localhost:8080
-2. Cliquer sur le job "MovieRec-Pipeline"
-3. Cliquer sur "Build Now"
-4. Voir le progression dans "Console Output"
-
-**Manuellement sur l'agent:**
-```bash
-# Se connecter à l'agent
-vagrant ssh jenkins-agent
-
-# Build et déploiement manuel
-cd /vagrant
-sudo docker-compose build
-sudo docker-compose up -d
-```
+**Manuellement:**
+- Jenkins → MovieRec-Pipeline → Build Now
 
 ## 🛠️ Commandes Utiles
+
+### Git
+```bash
+# Initialiser le repo
+git init
+git add .
+git commit -m "Initial commit"
+git branch -M main
+git remote add origin <votre-repo-url>
+git push -u origin main
+
+# Mettre à jour
+git add .
+git commit -m "Update"
+git push
+```
 
 ### Docker
 ```bash
 # Voir les logs
-sudo docker-compose logs -f
+docker compose logs -f
 
 # Redémarrer un service
-sudo docker-compose restart backend
+docker compose restart backend
 
 # Supprimer tout et recommencer
-sudo docker-compose down -v
-sudo docker-compose up --build -d
-```
-
-### Vagrant
-```bash
-# Status des VMs
-vagrant status
-
-# Redémarrer une VM
-vagrant reload jenkins-master
-
-# Arrêter les VMs
-vagrant halt
-
-# Détruire et recréer
-vagrant destroy -f
-vagrant up
+docker compose down -v
+docker compose up --build -d
 ```
 
 ### Debugging
 ```bash
 # Entrer dans un container
-sudo docker exec -it movierec-backend-1 sh
+docker exec -it movierec-backend-1 sh
 
 # Voir les processus
-sudo docker-compose top
+docker compose top
 
 # Statistiques
-sudo docker stats
+docker stats
 ```
 
 ## 🧪 Tests
@@ -437,25 +313,19 @@ sudo docker-compose ps
 
 ## 🐛 Dépannage
 
-### L'agent SSH ne se connecte pas
+### Le pipeline échoue au build
 
 ```bash
-# Sur jenkins-agent
-vagrant ssh jenkins-agent
-systemctl status ssh
+# Vérifier Docker
+docker --version
+docker compose version
 
-# Vérifier la clé SSH
-sudo cat /home/jenkins/.ssh/id_rsa
+# Vérifier les fichiers
+ls -la frontend/ backend/ ia-service/
 
-# Tester la connexion depuis master
-vagrant ssh jenkins-master
-ssh jenkins@192.168.56.11
+# Build manuel pour voir l'erreur
+docker build -t test ./frontend
 ```
-
-**Solution:**
-- Vérifier que la clé privée est bien configurée dans Jenkins Credentials
-- Vérifier "Host Key Verification Strategy" = "Non verifying"
-- Redémarrer l'agent: Manage Nodes → agent-ssh → Disconnect → Launch agent
 
 ### Port déjà utilisé
 ```bash
@@ -467,46 +337,30 @@ sudo kill -9 <PID>
 ### Erreur de connexion entre services
 ```bash
 # Vérifier le réseau Docker
-sudo docker network ls
-sudo docker network inspect movierec_movierec-network
+docker network ls
+docker network inspect movierec_movierec-network
 
 # Vérifier les logs
-sudo docker-compose logs backend
-sudo docker-compose logs ia-service
-```
-
-### Le pipeline échoue au build
-```bash
-# Sur l'agent
-vagrant ssh jenkins-agent
-cd /vagrant
-
-# Vérifier les fichiers
-ls -la frontend/ backend/ ia-service/
-
-# Build manuel pour voir l'erreur
-sudo docker build -t test ./frontend
+docker compose logs backend
+docker compose logs ia-service
 ```
 
 ### Les services ne démarrent pas
 ```bash
 # Voir les logs détaillés
-sudo docker-compose logs -f
-
-# Redémarrer un service spécifique
-sudo docker-compose restart backend
+docker compose logs -f
 
 # Rebuild complet
-sudo docker-compose down -v
-sudo docker system prune -a
-sudo docker-compose up --build -d
+docker compose down -v
+docker system prune -a
+docker compose up --build -d
 ```
 
-### Rebuild complet
+### Jenkins ne trouve pas Docker
 ```bash
-sudo docker-compose down -v
-sudo docker system prune -a
-sudo docker-compose up --build -d
+# Ajouter jenkins au groupe docker
+sudo usermod -aG docker jenkins
+sudo systemctl restart jenkins
 ```
 
 ## 🔐 Sécurité
@@ -520,7 +374,52 @@ sudo docker-compose up --build -d
 - Le service IA utilise un algorithme de similarité cosinus simple et léger
 - La base de données est simulée en mémoire (12 films)
 - Pour la production, ajoutez une vraie base de données (PostgreSQL, MongoDB)
-- Ajoutez des tests unitaires et d'intégration
+- Le pipeline utilise `agent any` - fonctionne sur n'importe quel agent Jenkins
+- Compatible avec `docker compose` (v2) et `docker-compose` (v1)
+
+## 📂 Préparer pour Git
+
+### Créer un .gitignore
+
+```bash
+cat > .gitignore << 'EOF'
+# Node
+node_modules/
+npm-debug.log*
+package-lock.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Docker
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+EOF
+```
+
+### Initialiser Git
+
+```bash
+git init
+git add .
+git commit -m "Initial commit: MovieRec microservices project"
+git branch -M main
+git remote add origin https://github.com/<votre-user>/movierec.git
+git push -u origin main
+```
 
 ## 🚧 Améliorations Possibles
 
