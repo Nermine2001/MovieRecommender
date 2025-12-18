@@ -70,7 +70,7 @@ pipeline {
         stage('Build IA Service') {
             steps {
                 echo '========== Build du Service IA =========='
-                dir('ia-service') {
+                dir('ai-service') {
                     sh '''
                         docker build -t ${PROJECT_NAME}-ia:${BUILD_NUMBER} .
                         docker tag ${PROJECT_NAME}-ia:${BUILD_NUMBER} ${PROJECT_NAME}-ia:latest

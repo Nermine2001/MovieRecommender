@@ -24,6 +24,14 @@ const moviesDB = [
   { id: 10, title: "Goodfellas", genre: "Crime", rating: 8.7, year: 1990 },
   { id: 11, title: "Avatar", genre: "Sci-Fi", rating: 7.8, year: 2009 },
   { id: 12, title: "Gladiator", genre: "Action", rating: 8.5, year: 2000 },
+  { id: 13, title: "The Lord of the Rings: The Fellowship of the Ring", genre: "Fantasy", rating: 8.8, year: 2001 },
+  { id: 14, title: "The Lord of the Rings: The Two Towers", genre: "Fantasy", rating: 8.7, year: 2002 },
+  { id: 15, title: "The Lord of the Rings: The Return of the King", genre: "Fantasy", rating: 8.9, year: 2003 },
+  { id: 16, title: "Star Wars: Episode IV - A New Hope", genre: "Sci-Fi", rating: 8.7, year: 1977 },
+  { id: 17, title: "Star Wars: Episode V - The Empire Strikes Back", genre: "Sci-Fi", rating: 8.8, year: 1980 },
+  { id: 18, title: "Star Wars: Episode VI - Return of the Jedi", genre: "Sci-Fi", rating: 8.7, year: 1983 },
+  { id: 19, title: "Star Wars: Episode V - The Empire Strikes Back", genre: "Sci-Fi", rating: 8.8, year: 1980 },
+  // adding more movies without repeating the exixting movies
 ];
 
 // Route de santé
